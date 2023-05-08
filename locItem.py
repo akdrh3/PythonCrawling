@@ -2,33 +2,117 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support import expected_conditions as EC
 import time 
 import csv
-#ca_zip_codes = [95054]
-ca_zip_codes = [75001,75201, 75023] 
-#ca_zip_codes = [96017, 95959, 93610, 93238, 92223, 92243]  # Example zip codes for California
+
+
+ca_zip_codes = [93555, 93101, 95814, 90291, 92101, 94025, 93711,96073]
+tx_zip_codes = [78759, 77002, 75201, 76102, 78401, 78040, 79901, 78332, 75771, 79101] 
+
 unique_ids = set()
 rows = []
-def findLoc(locs):
+
+#url of the website to be scraped
+url = "https://www.wheretoshoot.org/"
+wait_time=4
+
+# Set driver as a Chrome driver
+driver = webdriver.Chrome("C./chromedriver")
+action = ActionChains(driver)
+
+# access the website
+driver.get(url)
+
+
+
+def main() :
+    #initialize csv file
+    with open('my_file.csv', 'w', newline='') as file:
+        file.write('')
+    #wait for the page to be loaded
+    driver.implicitly_wait(wait_time)
+    driver.maximize_window()
+
+    #click accept cookie button
+    coockie = driver.find_element(By.XPATH, '//*[@id="cookie_action_close_header"]')
+    coockie.click()
+
+    #select map-scale to 160 miles
+    selectScale()
+
+    #seach zip code and gather data for CA
+    searchZipCode(ca_zip_codes)
+
+    #save data as CSV file
+    with open('shooting_ranges_in_CA.csv', mode='w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+    #clear list and set for iteration 
+    unique_ids.clear()
+    rows.clear()
+
+    #seach zip code and gather data for TX
+    searchZipCode(tx_zip_codes)
+
+    #save data as CSV file
+    with open('shooting_ranges_in_TX.csv', mode='w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+
+def expand(locs):
     scroll_bar = driver.find_element(By.ID, 'mCSB_1_dragger_vertical')
     #loop through each one of location-item
     for n in range(1 , len(locs)+1): 
         id = "location-item-{}".format(n)
         block = driver.find_element(By.ID, id)
         try:
-        #try to click the element
+            #elick the element to expend
             try:
                 block.click()
-            #if it does not work, scroll page down and click
+            #if it does not work, scroll box down and click
             except :
                 try:
+                    time.sleep(1)
+                    action.drag_and_drop_by_offset(scroll_bar, 0, 40).perform()
+                    block.click()
+                #scroll page down
+                except:
+                    time.sleep(1)
+                    action.drag_and_drop_by_offset(scroll_bar, 0, -30).perform()
+                    # Find the inner div by its ID or class name
+                    inner_div = driver.find_element(By.XPATH,'//*[@id="where-to-shoot"]/div[2]/div[2]/div[3]/div')  # or driver.find_element_by_class_name('inner-div')
+
+                    # Get the height of the browser window
+                    window_height = driver.execute_script('return window.innerHeight;')
+
+                    # Get the initial height of the inner div
+                    inner_div_height = inner_div.size['height']
+
+                    # Scroll down until the bottom of the inner div is visible
+                    while driver.execute_script('return window.scrollY + arguments[0] < arguments[1];', window_height, inner_div_height):
+                        driver.execute_script('window.scrollBy(0, arguments[0]);', 60)
+                        time.sleep(1)
+                    block.click()
+            parse(id)
+
+            #click to minimize the component
+            try:
+                block.click()
+            except :
+                try:
+                    time.sleep(1)
                     action.drag_and_drop_by_offset(scroll_bar, 0, 40).perform()
                     block.click()
                 except:
+                    time.sleep(1)
+                    action.drag_and_drop_by_offset(scroll_bar, 0, -30).perform()
                     # Find the inner div by its ID or class name
                     inner_div = driver.find_element(By.XPATH,'//*[@id="where-to-shoot"]/div[2]/div[2]/div[3]/div')  # or driver.find_element_by_class_name('inner-div')
 
@@ -43,34 +127,17 @@ def findLoc(locs):
                         driver.execute_script('window.scrollBy(0, arguments[0]);', 40)
                         time.sleep(1)
                     block.click()
-            soup(id)
-            try:
-                block.click()
-            except :
-                try:
-                    action.drag_and_drop_by_offset(scroll_bar, 0, 40).perform()
-                    block.click()
-                except:
-                    # Find the inner div by its ID or class name
-                    inner_div = driver.find_element(By.XPATH,'//*[@id="where-to-shoot"]/div[2]/div[2]/div[3]/div')  # or driver.find_element_by_class_name('inner-div')
 
-                    # Get the height of the browser window
-                    window_height = driver.execute_script('return window.innerHeight;')
-
-                    # Get the initial height of the inner div
-                    inner_div_height = inner_div.size['height']
-
-                    # Scroll down until the bottom of the inner div is visible
-                    while driver.execute_script('return window.scrollY + arguments[0] < arguments[1];', window_height, inner_div_height):
-                        driver.execute_script('window.scrollBy(0, arguments[0]);', 40)
-                        time.sleep(1)
-                    block.click()
+        #when error occurs, move to next zipcode
         except:
             return()
 
-def soup(id):
+
+
+def parse(id):
     row = {}
-    attributes = ["Shooting range ID", "name", "is-member", "address", "address1", "phone", "email", "list-unstyled facility-details-list", "list-unstyled services-list", "list-unstyled shooting-av-list", "list-unstyled distance-list", "list-unstyled competitions-available-list"]
+
+    #set beautifulsoup to parse page
     soup = BeautifulSoup(driver.page_source,'lxml')
     attributes = soup.find("div", {"id": id})
     item_summary = attributes.find("div", {"class" : "location-item-summary"}).find("table", {'class' : 'table'})
@@ -180,59 +247,49 @@ def soup(id):
     website = web['href'] if web else ''
     row['Website'] = website
 
-    print(row)
+    print(len(rows), "\n")
     rows.append(row)
 
 
 
+def selectScale():
+    #click dropdown bar 
+    dropdown = driver.find_element(By.XPATH, '//*[@id="dropdownMenu1"]')
+    dropdown.click()
 
-#url of the website to be scraped
-url = "https://www.wheretoshoot.org/"
-wait_time=4
-delay_time=0.1
-
-# Set driver as a Chrome driver
-driver = webdriver.Chrome("C./chromedriver")
-action = ActionChains(driver)
-# access the website
-driver.get(url)
-driver.maximize_window()
-
-#click accept cookie button
-coockie = driver.find_element(By.XPATH, '//*[@id="cookie_action_close_header"]')
-coockie.click()
-
-
-#wait for the page to be loaded
-driver.implicitly_wait(wait_time)
-
-dropdown = driver.find_element(By.XPATH, '//*[@id="dropdownMenu1"]')
-dropdown.click()
-WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, '//*[@id="miles"]/ul/li[6]/a')))
-time.sleep(2)
-driver.implicitly_wait(wait_time)
-first_option = driver.find_element(By.XPATH, '//*[@id="miles"]/ul/li[6]/a')
-driver.execute_script("arguments[0].scrollIntoView(true);", first_option)
-first_option.click()
-driver.execute_script("arguments[0].scrollIntoView(true);", dropdown)
-dropdown.click()
-time.sleep(3)
-search = driver.find_element(By.XPATH,'//*[@id="search"]')
-
-for zip in ca_zip_codes:
-    search.send_keys(zip)
+    #wait for components to be loaded
     time.sleep(2)
-    search.send_keys(Keys.ARROW_DOWN)
-    search.send_keys(Keys.ENTER)
-    time.sleep(1)
-    locs = driver.find_elements(By.CLASS_NAME,'location-item')
-    findLoc(locs)
-    search.clear()
-    time.sleep(5)
 
-with open('shooting_ranges.csv', mode='w', newline='') as file:
-    writer = csv.DictWriter(file, fieldnames=list(rows[0].keys()))
-    writer.writeheader()
-    writer.writerows(rows)
+    #select scale -- set to within 160 miles in here
+    scale = driver.find_element(By.XPATH, '//*[@id="miles"]/ul/li[6]/a')
+    driver.execute_script("arguments[0].scrollIntoView(true);", scale)
+    time.sleep(1)
+    scale.click()
+
+    #scroll back to drop down manu for the better view
+    driver.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+    time.sleep(3)
+
+
+
+def searchZipCode(zip_codes):
+    #select search bar
+    search = driver.find_element(By.XPATH,'//*[@id="search"]')
+
+    #iterate through zip codes
+    for zip in zip_codes:
+        search.send_keys(zip)
+        time.sleep(2)
+        search.send_keys(Keys.ARROW_DOWN)
+        search.send_keys(Keys.ENTER)
+        time.sleep(1)
+        locs = driver.find_elements(By.CLASS_NAME,'location-item')
+        expand(locs)
+        search.clear()
+        time.sleep(3)
+
+
+if __name__ == "__main__":
+    main()
 
 
