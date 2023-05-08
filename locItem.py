@@ -7,6 +7,9 @@ from selenium.webdriver.support import expected_conditions as EC
 import time 
 import csv
 
+# This project employs chromedriver downloaded from the internet
+# It is downloadable from https://chromedriver.chromium.org/downloads
+# After downloading it, locate chromedriver execution file in the same folder where project lies
 
 ca_zip_codes = [93555, 93101, 95814, 90291, 92101, 94025, 93711,96073]
 tx_zip_codes = [78759, 77002, 75201, 76102, 78401, 78040, 79901, 78332, 75771, 79101] 
